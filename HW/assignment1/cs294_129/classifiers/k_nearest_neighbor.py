@@ -79,7 +79,11 @@ class KNearestNeighbor(object):
     num_train = self.X_train.shape[0]
     dists = np.zeros((num_test, num_train))
     for i in xrange(num_test):
-      dists[i,:] = np.sum((X[i]-self.X_train[:])**2,axis=1)
+      #dists[i,:] = np.sum((X[i]-self.X_train[:])**2,axis=1)  #slow version
+      term1 = np.sum(X[i]*X[i])
+      term2 = -2*X[i].dot(self.X_train.T)
+      term3 = np.sum(self.X_train*self.X_train,axis=1)
+      dists[i] = term1+term2+term3
     return dists
 
   def compute_distances_no_loops(self, X):
@@ -104,9 +108,16 @@ class KNearestNeighbor(object):
     # HINT: Try to formulate the l2 distance using matrix multiplication    #
     #       and two broadcast sums.                                         #
     #########################################################################
-    XX = X.reshape(X.shape[0],1,X.shape[1])
-    print XX.shape, (XX-self.X_train).shape
-    #dists = np.sum((XX-self.X_train)**2,axis=2)
+    #XX = X.reshape(X.shape[0],1,X.shape[1]) 
+    #print XX.shape, (XX-self.X_train).shape
+    #dists = np.sum((XX-self.X_train)**2,axis=2)     #really slow or not working, but works in python 3?
+    M = num_test; N = num_train
+    #print "terms"
+    term1 = np.sum(X*X,axis=1)
+    term2 = -2*X.dot(self.X_train.T)
+    term3 = np.sum(self.X_train*self.X_train,axis=1)
+    #print "broadcasting:"
+    dists = term1.reshape(M,1)+term2+term3.reshape(1,N)
     return dists
 
   def predict_labels(self, dists, k=1):
