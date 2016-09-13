@@ -29,10 +29,22 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
-  #############################################################################
-  #                          END OF YOUR CODE                                 #
-  #############################################################################
+  num_train = X.shape[0]
+  num_class = W.shape[1]
+  loss = 0.
+  for i in xrange(num_train):
+    scores = X[i].dot(W)  #1 by num_class
+    scores -= max(scores)   #bias to prevent instability
+    sumscores = np.sum(np.exp(scores))
+    prob = np.exp(scores[y[i]])/sumscores
+    loss -= np.log(prob)
+    dW[:,y[i]] += -X[i]
+    for j in xrange(num_class): 
+      dW[:,j] -= -1./sumscores*np.exp(scores[j])*X[i]
+  loss /= num_train
+  dW /= num_train
+
+
 
   return loss, dW
 
@@ -46,17 +58,23 @@ def softmax_loss_vectorized(W, X, y, reg):
   # Initialize the loss and gradient to zero.
   loss = 0.0
   dW = np.zeros_like(W)
-
+  num_train = X.shape[0]
+  num_class = W.shape[1]
   #############################################################################
   # TODO: Compute the softmax loss and its gradient using no explicit loops.  #
   # Store the loss in loss and the gradient in dW. If you are not careful     #
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
-  #############################################################################
-  #                          END OF YOUR CODE                                 #
-  #############################################################################
+  S = X.dot(W) #num_train by num_class
+  S -= np.amax(S,axis=1).reshape(S.shape[0],1)
+  Is = np.arange(num_train)
+  S_correct = S[Is,y[Is]]   #num_train by 1
+  S_summed = np.sum(S, axis=1) #num_train by 1
+  prob = S_correct/S_summed
+  loss = - np.mean(np.log(prob))
+
+
 
   return loss, dW
 
