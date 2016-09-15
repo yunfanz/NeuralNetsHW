@@ -93,9 +93,11 @@ def svm_loss_vectorized(W, X, y, reg):
   #############################################################################
   mask = np.zeros((num_train,num_class))
   cover = np.where(1+S-S_correct>0)
-  mask[cover[0],cover[1]] += 1
-  mask[cover[0],y[cover[0]]] -= 2
+  mask[cover[0],cover[1]] = 1
+  num_class_activated = np.unique(cover[0],return_counts=True)
+  mask[num_class_activated[0],y[num_class_activated[0]]] -= num_class_activated[1]
+  #problem is there are repeated values in cover[0], and only unique copies are iterated over. 
   dW += reg*W 
   dW += X.T.dot(mask)/num_train
-  print X.shape, mask.shape
+  #print X.shape, mask.shape
   return loss, dW
