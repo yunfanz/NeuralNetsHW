@@ -219,14 +219,15 @@ def batchnorm_backward(dout, cache):
   x, x1, gamma, mean, var = cache
   N, D = x.shape
   #rescaling node
-  dgamma = np.dot(dout.T, x1)
-  dbeta = np.dot(dout.T, np.ones_like(x1))
+  dgamma = np.sum(dout*x1,axis=0)
+  dbeta = np.sum(dout.T, axis=1)
   dx1 = dout*gamma.reshape((1,D))
 
   #Normalizing node
   std = np.sqrt(var)
   x_centered = x1*std
-  assert(np.amax(x_centered-(x-mean))/np.mean(mean)<1.e-9)
+  assert(np.amax(x_centered-(x-mean))/np.mean(mean)<1.e-9), "x1 was incorrect"
+  dl_dmu = 
   dvar_dxcentered = 2.*x_centered/N
   dstd_dxcentered = dvar_dxcentered/2/std
   dx_centered = dx1/var*(np.sqrt(var)-x_centered*dstd_dxcentered)
