@@ -227,13 +227,15 @@ def batchnorm_backward(dout, cache):
   std = np.sqrt(var)
   x_centered = x1*std
   assert(np.amax(x_centered-(x-mean))/np.mean(mean)<1.e-9), "x1 was incorrect"
-  dl_dmu = 
-  dvar_dxcentered = 2.*x_centered/N
-  dstd_dxcentered = dvar_dxcentered/2/std
-  dx_centered = dx1/var*(np.sqrt(var)-x_centered*dstd_dxcentered)
+  dl_dx = dx1/np.sqrt(var)
+  dl_dvar = np.sum(-dx1*(x_centered/2/var**1.5),axis=0)  #(,D)
+  dl_dmu = -np.sum(dl_dx, axis=0)  #(,D)
 
-  #centering node
-  dx = dx_centered*(1-1./N)
+  dx_thmu = dl_dmu.reshape((1,D))/N  #to be broadcasted to (N,D)
+  dvar_dx = 2.*x/N-2.*mean/N
+  dx_thvar = dvar_dx*dl_dvar.reshape((1,D))
+
+  dx = dl_dx+dx_thmu+dx_thvar
 
   #############################################################################
   #                             END OF YOUR CODE                              #
@@ -264,7 +266,12 @@ def batchnorm_backward_alt(dout, cache):
   # should be able to compute gradients with respect to the inputs in a       #
   # single statement; our implementation fits on a single 80-character line.  #
   #############################################################################
-  pass
+  x, x1, gamma, mean, var = cache
+  N, D = x.shape
+  dgamma = np.sum(dout*x1,axis=0)
+  dbeta = np.sum(dout.T, axis=1)
+  dx1 = dout*gamma.reshape((1,D))
+  dx = (dx1-np.mean(dx1, axis=0))/np.sqrt(var)-np.sum(dx1*(x-mean),axis=0)/var**1.5*(x-mean)/N
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -303,7 +310,15 @@ def dropout_forward(x, dropout_param):
     # TODO: Implement the training phase forward pass for inverted dropout.   #
     # Store the dropout mask in the mask variable.                            #
     ###########################################################################
-    pass
+    mask = np.random.rand(x.shape[1])>p 
+    mask.reshape((1,mask.shape[0]))
+    # this way masks out columns, which to me corresponds to dropping neurons. 
+    # One can also mask out elements one by one:
+    # mask = np.random.rand(*x.shape)>p 
+    # But in practice it seems to work a little less effectively. 
+    mask = mask / (1-p)
+    out = x*mask
+
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
@@ -311,11 +326,10 @@ def dropout_forward(x, dropout_param):
     ###########################################################################
     # TODO: Implement the test phase forward pass for inverted dropout.       #
     ###########################################################################
-    pass
+    out = x
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
-
   cache = (dropout_param, mask)
   out = out.astype(x.dtype, copy=False)
 
@@ -338,7 +352,7 @@ def dropout_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the training phase backward pass for inverted dropout.  #
     ###########################################################################
-    pass
+    dx = dout*mask
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################

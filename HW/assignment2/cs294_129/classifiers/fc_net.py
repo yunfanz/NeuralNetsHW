@@ -209,7 +209,11 @@ class FullyConnectedNet(object):
     self.bn_params = []
     if self.use_batchnorm:
       self.bn_params = [{'mode': 'train'} for i in xrange(self.num_layers - 1)]
-    
+      for i, L in enumerate(hidden_dims):
+        self.params['gamma'+str(i+1)] = np.ones(L)
+        self.params['beta'+str(i+1)] = np.zeros(L)
+    # bn_param contains running_mean and variances, initialized in layers.py
+
     # Cast all parameters to the correct datatype
     for k, v in self.params.iteritems():
       try: self.params[k] = v.astype(dtype)
@@ -253,7 +257,26 @@ class FullyConnectedNet(object):
     out = X
     for i, L in enumerate(self.hidden_dims):
       W, b = self.params['W'+str(i+1)], self.params['b'+str(i+1)]
-      out,cache = affine_relu_forward(out, W, b)
+      if self.use_batchnorm:
+        fc_out, fc_cache = affine_forward(out,W, b)
+        bn_param = self.bn_params[i]
+        gamma = self.params['gamma'+str(i+1)]
+        beta = self.params['beta'+str(i+1)]
+        bn_out, bn_cache = batchnorm_forward(fc_out,gamma, beta,bn_param)
+        out, relu_cache = relu_forward(bn_out)
+        if self.use_dropout:
+          out, dp_cache = dropout_forward(out,self.dropout_param)
+          cache = (fc_cache,bn_cache, relu_cache, dp_cache)
+        else:
+          cache = (fc_cache,bn_cache, relu_cache)
+
+      else:
+        out,ar_cache = affine_relu_forward(out, W, b)
+        if self.use_dropout:
+          out, dp_cache = dropout_forward(out,self.dropout_param)
+          cache = (ar_cache, dp_cache)
+        else:
+          cache = ar_cache
       hidden_cache.append(cache)
     W, b = self.params['W'+str(i+2)], self.params['b'+str(i+2)]
     scores,fc_cache = affine_forward(out, W, b)
@@ -285,7 +308,24 @@ class FullyConnectedNet(object):
     grads['W'+str(self.num_layers)] = dW
     grads['b'+str(self.num_layers)] = db
     for i, cache in enumerate(hidden_cache[::-1]):
-      dout,dW,db = affine_relu_backward(dout,cache) 
+      if self.use_batchnorm:
+        if self.use_dropout:
+          fc_cache,bn_cache, relu_cache, dp_cache = cache
+          dout = dropout_backward(dout,dp_cache)
+        else:
+          fc_cache,bn_cache, relu_cache = cache
+        relu_dout = relu_backward(dout,relu_cache)
+        bn_dout,dgamma, dbeta = batchnorm_backward_alt(relu_dout,bn_cache)
+        dout, dW,db = affine_backward(bn_dout, fc_cache)
+        grads['gamma'+str(self.num_layers-i-1)] = dgamma
+        grads['beta'+str(self.num_layers-i-1)] = dbeta
+      else:
+        if self.use_dropout:
+          ar_cache, dp_cache = cache
+          dout = dropout_backward(dout,dp_cache)
+        else:
+          ar_cache = cache
+        dout,dW,db = affine_relu_backward(dout,ar_cache) 
       grads['W'+str(self.num_layers-i-1)] = dW
       grads['b'+str(self.num_layers-i-1)] = db
     for i in range(self.num_layers):
