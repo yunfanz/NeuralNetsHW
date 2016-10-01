@@ -389,7 +389,47 @@ def conv_forward_naive(x, w, b, conv_param):
   # TODO: Implement the convolutional forward pass.                           #
   # Hint: you can use the function np.pad for padding.                        #
   #############################################################################
-  pass
+  F, C, HH, WW = w.shape
+  N, C, H, W = x.shape
+  pad = conv_param['pad']; stride = conv_param['stride']
+  Hp = 1 + (H + 2 * pad - HH) / stride
+  Wp = 1 + (W + 2 * pad - WW) / stride
+  #print Hp, Wp
+  out = np.zeros((N,F,Hp,Wp))
+  x_pad = np.pad(x,((0,),(0,),(pad,),(pad,)),'constant',constant_values=0)
+
+
+  # Naive method 
+
+  # xs = x_pad
+  # ws = w#[:,:,::-1,::-1]
+  # for n,x in enumerate(xs):
+  #   for f,w in enumerate(ws):
+  #     for hp in xrange(Hp):
+  #       for wp in xrange(Wp):
+  #         left, top = hp*stride, wp*stride
+  #         out[n,f,hp,wp] += np.sum(w*x[:,left:left+HH,top:top+WW])+b[f]
+ 
+
+  # alternative Fourier method, both work
+
+  w_pad = np.pad(w,((0,0),(0,0),(pad+(H-HH)/2,pad+(H-HH+1)/2),(pad+(W-WW)/2,pad+(W-WW+1)/2)),'constant',constant_values=0)
+  w_pad = w_pad[:,:,::-1,::-1]
+  #print x_pad.shape, w_pad.shape, H, HH
+  assert(x_pad[0].shape==w_pad[0].shape), "wrong padding"
+  for n,xt in enumerate(x_pad):
+    for f,wt in enumerate(w_pad):
+      xf = np.fft.fft(np.fft.fft(xt),axis=1)
+      wf = np.fft.fft(np.fft.fft(wt),axis=1)
+      conv_full = np.fft.ifft(np.fft.ifft(xf*wf),axis=1)
+      conv_full = np.fft.ifftshift(conv_full, axes=(1,2))
+      conv_stride = np.sum(conv_full[:,1:-1:stride,1:-1:stride],axis=0).real+b[f]
+      out[n,f] += conv_stride
+ 
+
+
+
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -414,7 +454,33 @@ def conv_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the convolutional backward pass.                          #
   #############################################################################
-  pass
+  xs, ws, b, conv_param = cache
+  pad = conv_param['pad']; stride = conv_param['stride']
+  N,F,Hp,Wp = dout.shape
+  print xs.shape
+  N,C,H,W = xs.shape
+  HH,WW = ws.shape[2], ws.shape[3]
+  dw = np.zeros_like(ws)
+  dx = np.zeros_like(xs)
+  db = np.sum(np.sum(np.sum(dout,axis=3),axis=2),axis=0)
+  for n,xc in enumerate(xs):
+    for c, x in enumerate(xc):
+      for f, d in enumerate(dout[n]):
+        for i in xrange(H):
+          for j in xrange(W):
+            k1 = np.arange(HH)
+            k2 = np.arange(WW)
+            w = ws[f,c]
+            dx[n,c,i,j] += np.sum(w[k1,k2]*d[(i-k1)/stride,(j-k2)/stride])
+        for i in xrange(HH):
+          for j in xrange(WW):
+            k1 = np.arange(d.shape[0])
+            k2 = np.arange(d.shape[1])
+            x_pad = np.pad(x,((pad,),(pad,)),'constant',constant_values=0)
+            dw[f,c,i,j] += np.sum(d[k1,k2]*x_pad[i+stride*k1,j+stride*k2])
+
+
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -440,7 +506,20 @@ def max_pool_forward_naive(x, pool_param):
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  pass
+  i = 0
+  j = 0
+  p_h = pool_param['pool_height']; p_w = pool_param['pool_width']
+  stride = pool_param['stride']
+  _,_,H,W=x.shape
+  HH = (H-p_h)/stride+1; WW = (W-p_w)/stride+1
+  out = np.zeros((H, W,HH,WW))
+  print out.shape
+  while i*stride+p_h<H:
+    while j*stride+p_w<W:
+      pool =np.asarray([np.arange(p_h)+i, np.arange(p_w)+j])
+      out[:,:,i,j] = np.amax(np.amax(x[:,:,pool],axis=3),axis=2)
+      i+=1; j+=1
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
