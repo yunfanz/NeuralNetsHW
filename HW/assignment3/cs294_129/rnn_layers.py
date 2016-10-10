@@ -144,13 +144,14 @@ def rnn_backward(dh, cache):
   dWh = np.zeros((H,H))
   db = np.zeros((H,))
   dhc = 0
+  dht = 0
   for t in np.arange(T)[::-1]:
-    dhc += dh[:,t,:]
+    dhc = dht+dh[:,t,:]
     dx[:,t,:], dht, dWxt, dWht, dbt = rnn_step_backward(dhc, cache[t])
     dWx += dWxt
     dWh += dWht
     db += dbt
-  dh0 = dhc
+  dh0 = dht
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -178,7 +179,8 @@ def word_embedding_forward(x, W):
   #                                                                            #
   # HINT: This should be very simple.                                          #
   ##############################################################################
-  pass
+  out = W[x[:,:]]
+  cache = (x, W)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -206,7 +208,10 @@ def word_embedding_backward(dout, cache):
   #                                                                            #
   # HINT: Look up the function np.add.at                                       #
   ##############################################################################
-  pass
+  x,W = cache
+  dW = np.zeros_like(W)
+  N, T, D = dout.shape
+  np.add.at(dW,x.flatten(),dout.reshape((N*T,D)))
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
