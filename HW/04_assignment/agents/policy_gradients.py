@@ -63,9 +63,22 @@ class PolicyGradient(object):
         self.running_rewards = []
 
 
-    def sigmoid(self, x): 
-        """ Standard sigmoid, to make the output in (0,1). """
-        return 1.0 / (1.0 + np.exp(-x))
+    # def sigmoid(self, x): 
+    #     """ Standard sigmoid, to make the output in (0,1). """
+    #     return 1.0 / (1.0 + np.exp(-x))
+
+    def sigmoid(self, x):
+          """
+          A numerically stable version of the logistic sigmoid function.
+          """
+          pos_mask = (x >= 0)
+          neg_mask = (x < 0)
+          z = np.zeros_like(x)
+          z[pos_mask] = np.exp(-x[pos_mask])
+          z[neg_mask] = np.exp(x[neg_mask])
+          top = np.ones_like(x)
+          top[neg_mask] = z[neg_mask]
+          return top / (1 + z)
     def dsigmoid(self, x):
         s = self.sigmoid(x)
         return s*(1-s)
@@ -142,6 +155,7 @@ class PolicyGradient(object):
             discounted_r = np.array([np.sum((r*self.gamma**(ind-i))[i:next_reset(i)+1]) for i in ind])
         else:
             discounted_r = np.array([np.sum((r*self.gamma**(ind-i))[i:]) for i in ind])
+        discounted_r = discounted_r.reshape((-1, 1))
         ########################################################################
         #                           END OF YOUR CODE                           #
         ########################################################################
@@ -178,11 +192,12 @@ class PolicyGradient(object):
         # to vectorize the code to get (Pong) results quickly.                 #
         ########################################################################
         #   w2*relu(W1*x==h)
-        dW1 = np.zeros(self.H, self.D)
+        dW1 = np.zeros((self.H, self.D))
         dW2 = np.zeros(self.H)
         dout = self.dsigmoid(ep_dprobs*discounted_epr)
         dW2 = np.dot(dout.T, ep_h)[0]
-        mask = np.where(ep_h>0)
+        mask = np.where(ep_h>0, np.ones_like(ep_h), np.zeros_like(ep_h))
+        #print dout.shape, self.model['W2'].shape, mask.shape, ep_h.shape
         dL1 = dout * self.model['W2'] * mask
         dW1 = np.dot(dL1.T, ep_x)
 
@@ -259,7 +274,8 @@ class PolicyGradient(object):
             # This should be a one-liner. For more info, see:                  #
             # http://cs231n.github.io/neural-networks-2/#losses                #
             ####################################################################
-            dprobs.append(y)
+            # this is derivative of the log prob
+            dprobs.append(1/aprob)
             ####################################################################
             #                        END OF YOUR CODE                          #
             ####################################################################
@@ -268,7 +284,7 @@ class PolicyGradient(object):
             # Also record reward in 'drs', which has to be done after step().
             observation, reward, done, info = env.step(action)
             reward_sum += reward
-            drs.append(reward) 
+            drs.append(reward)
         
             if done:
                 episode_number += 1
