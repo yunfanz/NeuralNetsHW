@@ -194,9 +194,9 @@ class PolicyGradient(object):
         #   w2*relu(W1*x==h)
         dW1 = np.zeros((self.H, self.D))
         dW2 = np.zeros(self.H)
-        print self.model['W2'].shape, ep_h.shape, discounted_epr.shape, ep_dprobs.shape
-        dout = discounted_epr*ep_dprobs*self.dsigmoid(np.dot(self.model['W2'], ep_h))
-        #print ep_dprobs*discounted_epr
+        #print self.model['W2'].shape, ep_h.shape, discounted_epr.shape, ep_dprobs.shape
+        dout = discounted_epr*ep_dprobs*self.dsigmoid(np.dot(ep_h, self.model['W2'])).reshape((-1,1))
+        #print dout.T[0]
         dW2 = np.dot(dout.T, ep_h)[0]
         mask = np.where(ep_h>0, np.ones_like(ep_h), np.zeros_like(ep_h))
         #print dout.shape, self.model['W2'].shape, mask.shape, ep_h.shape
@@ -281,7 +281,7 @@ class PolicyGradient(object):
             # http://cs231n.github.io/neural-networks-2/#losses                #
             ####################################################################
             # this is derivative of the log prob
-            dprobs.append(1/aprob)
+            dprobs.append(y-aprob)
             ####################################################################
             #                        END OF YOUR CODE                          #
             ####################################################################
