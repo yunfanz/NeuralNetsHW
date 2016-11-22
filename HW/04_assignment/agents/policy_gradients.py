@@ -63,9 +63,9 @@ class PolicyGradient(object):
         self.running_rewards = []
 
 
-    # def sigmoid(self, x): 
-    #     """ Standard sigmoid, to make the output in (0,1). """
-    #     return 1.0 / (1.0 + np.exp(-x))
+    def sigmoid(self, x): 
+        """ Standard sigmoid, to make the output in (0,1). """
+        return 1.0 / (1.0 + np.exp(-x))
 
     def sigmoid(self, x):
           """
@@ -155,7 +155,7 @@ class PolicyGradient(object):
             discounted_r = np.array([np.sum((r*self.gamma**(ind-i))[i:next_reset(i)+1]) for i in ind])
         else:
             discounted_r = np.array([np.sum((r*self.gamma**(ind-i))[i:]) for i in ind])
-        discounted_r = discounted_r.reshape((-1, 1))
+        #discounted_r = discounted_r.reshape((-1, 1))
         ########################################################################
         #                           END OF YOUR CODE                           #
         ########################################################################
@@ -194,12 +194,16 @@ class PolicyGradient(object):
         #   w2*relu(W1*x==h)
         dW1 = np.zeros((self.H, self.D))
         dW2 = np.zeros(self.H)
-        dout = self.dsigmoid(ep_dprobs*discounted_epr)
+        print self.model['W2'].shape, ep_h.shape, discounted_epr.shape, ep_dprobs.shape
+        dout = discounted_epr*ep_dprobs*self.dsigmoid(np.dot(self.model['W2'], ep_h))
+        #print ep_dprobs*discounted_epr
         dW2 = np.dot(dout.T, ep_h)[0]
         mask = np.where(ep_h>0, np.ones_like(ep_h), np.zeros_like(ep_h))
         #print dout.shape, self.model['W2'].shape, mask.shape, ep_h.shape
         dL1 = dout * self.model['W2'] * mask
         dW1 = np.dot(dL1.T, ep_x)
+        #print dout
+        #print self.model['W2']
 
         ########################################################################
         #                           END OF YOUR CODE                           #
@@ -233,7 +237,7 @@ class PolicyGradient(object):
         reward_sum = 0
         episode_number = 0
         start = time.time()
-
+        sur = 0
         # Each iteration is one time step; loop exits according to max_episodes.
         while True:
             if self.render: env.render()
@@ -242,12 +246,14 @@ class PolicyGradient(object):
                 # In CartPole, 0=LEFT, 1=RIGHT.
                 x = observation
                 aprob, h = self.policy_forward(x)
+                #print aprob
                 action = 0 if np.random.uniform() < aprob else 1
 
                 # Assume y=1 means LEFT and y=0 means RIGHT. These are like fake
                 # supervised learning labels. We write these here and the policy
                 # gradient reward sum term will scale it (+ or -) appropriately.
                 y = 1 if action == 0 else 0 
+
 
             elif environment == "Pong-v0":
                 # Preprocess observation, setting network input to be the frame difference.
@@ -285,15 +291,19 @@ class PolicyGradient(object):
             observation, reward, done, info = env.step(action)
             reward_sum += reward
             drs.append(reward)
-        
+            #print action, reward, done
+            sur += 1
             if done:
                 episode_number += 1
+                #print sur
+                sur = 0
 
                 # Stack all inputs, hidden states, action gradients, and rewards for this episode
                 ep_x = np.vstack(xs)
                 ep_h = np.vstack(hs)
                 ep_dprobs = np.vstack(dprobs)
-                ep_r = np.vstack(drs)
+                ep_r = np.array(np.vstack(drs))
+                #print ep_r.shape
                 xs,hs,dprobs,drs = [],[],[],[]
         
                 # Compute the discounted reward backwards through time, using
@@ -301,7 +311,12 @@ class PolicyGradient(object):
                 reset = False
                 if environment == "Pong-v0":
                     reset = True
-                discounted_epr = self.discount_rewards(ep_r, do_reset=reset)
+                #ep_r_h = np.hstack(drs)
+                # discounted_epr = []
+                # for ep_rh in ep_r:
+                #     discounted_epr.append(self.discount_rewards(ep_rh, do_reset=reset))
+                discounted_epr = self.discount_rewards(ep_r.T[0], do_reset=reset).reshape((-1,1))
+                #print discounted_epr.shape
 
                 ################################################################
                 # TODO: Using discounted_epr, ep_x, ep_h, and ep_dprobs,       #
@@ -313,7 +328,12 @@ class PolicyGradient(object):
                 # has mean 0 and standard deviation 1, to control the gradient #
                 # estimator variance.                                          #
                 ################################################################
-                self.grad_buffer = self.policy_backward(ep_x, ep_h, ep_dprobs, discounted_epr)
+                mm, vv = discounted_epr.mean(), max(discounted_epr.std(), 1e-6)
+                discounted_epr = (discounted_epr-mm)/vv
+                #print discounted_epr
+                grads = self.policy_backward(ep_x, ep_h, ep_dprobs, discounted_epr)
+                for k, v in grads.iteritems():
+                    self.grad_buffer[k] += v
                 ################################################################
                 #                        END YOUR CODE                         #
                 ################################################################
